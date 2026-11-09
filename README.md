@@ -1,9 +1,61 @@
-# Agents
+# My Agents (`nachfq.agents`)
+
+Personal customization of Omarchy's Agents bar widget, published by
+[nachfq](https://github.com/nachfq). The plugin keeps the `nachfq.agents`
+identity and the upstream Omarchy attribution in `manifest.json`.
+
+The original widget, collectors, and most of this documentation come from
+[Omarchy](https://github.com/omacom/omarchy), licensed under MIT. See
+[LICENSE](LICENSE), copied unchanged from the
+[upstream v4.0.6 release](https://github.com/omacom/omarchy/blob/v4.0.6/LICENSE),
+for the upstream copyright and permission notice.
+
+## Install
+
+Requires an Omarchy installation with the shell plugin system, Quickshell,
+and the installed `omarchy-agent-usage-*` collectors. Offline backend tests
+pass against Omarchy 4.0.6. This is a customization of those collectors,
+not a standalone usage monitor: `usage-codex.py` imports
+`$OMARCHY_PATH/bin/omarchy-agent-usage-codex` (default
+`/usr/share/omarchy/bin/omarchy-agent-usage-codex`). The shell must have
+`OMARCHY_PATH` set for `usage-update` to discover the installed collectors.
+
+Python 3 (standard library only), Bash, `jq`, `find`, and `rg` are required.
+Codex usage requires the signed-in Codex CLI and its app-server API; reset
+credits require a CLI/account that supports the reset-credit RPCs. Claude
+and Fireworks use the installed Omarchy collectors and their own credentials.
+
+On a machine without this personal plugin already installed:
+
+```bash
+omarchy plugin disable omarchy.agents
+omarchy plugin add https://github.com/nachfq/omarchy-agents.git --enable
+```
+
+The plugin installs at `~/.config/omarchy/plugins/nachfq.agents`, the path
+used by its helper commands. Disable the stock widget to avoid duplicate
+panels; enable this one with `omarchy plugin enable nachfq.agents` if added
+without `--enable`. An existing local clone with the same plugin ID must be
+backed up and reconciled before installation; `plugin add` refuses duplicates.
+
+## Local state
+
+Credentials, usage records, collector caches, and pending reset requests are
+machine-local and are not included in this repository. Usage records live in
+`${XDG_STATE_HOME:-~/.local/state}/omarchy/agents/usage/`; pending reset state
+is `omarchy/codex-reset-pending.json` under the same state root, with a sibling
+lock file. Installed collectors also maintain caches under
+`${XDG_CACHE_HOME:-~/.cache}/omarchy/agent-usage/`. Optional synced snapshots
+live in the configured `syncDir`; keep that directory outside this checkout.
+Authentication stays in each CLI's normal credential store. The ignore rules
+also exclude common accidental copies of runtime state and credentials.
 
 ## Local Codex customization
 
 This clone shows Codex's weekly percentage and time until its automatic reset
-(`35% 5d14h`) in the bar. It refreshes every 60 seconds. The Codex panel also
+(`35% 5d14h`) in the bar. Collection uses `refreshIntervalSec` (900 seconds
+by default), with additional refreshes when the panel opens or you request
+one; the countdown updates every 30 seconds. The Codex panel also
 shows the server-reported reset-credit count and earliest available expiry
 in local time. Missing credit details are displayed as unknown.
 
@@ -18,9 +70,10 @@ endpoint and never consume a real credit. `reset-codex.py` is the live action
 helper and should only be invoked when intending to spend a reset.
 
 One bar icon and one panel for every AI coding subscription on the machine.
-The panel is strictly a display: it watches the usage records that
-`omarchy-agent-usage-update` writes to `~/.local/state/omarchy/agents/usage/`
-and draws whatever appears there. `Panel.qml` owns the bar button and the
+The panel watches the usage records that the local `usage-update` wrapper
+writes to `~/.local/state/omarchy/agents/usage/` and draws whatever appears
+there. The explicit reset button is the account-changing action described
+above. `Panel.qml` owns the bar button and the
 popup; `Main.qml` discovers and watches the records (and handles the optional
 cross-device aggregation); `Agent.qml` is the per-record file watcher.
 
@@ -48,22 +101,22 @@ there is no switch row at all; with none, the module leaves the bar entirely
 rather than sitting there with nothing to say. A CLI installed mid-session
 shows up at the next refresh, so nothing polls the disk waiting for it.
 
-That self-hiding is why the widget ships in the default bar layout: a machine
-that has never run an AI coding agent draws nothing, and the icon arrives on
-its own the first time a scan finds usage. Drop it with
-`omarchy plugin disable omarchy.agents`.
+A machine that has never run an AI coding agent draws nothing, and the icon
+arrives on its own the first time a scan finds usage. Drop this custom widget
+with `omarchy plugin disable nachfq.agents`.
 
 ## Data
 
 Each agent is one JSON record in `~/.local/state/omarchy/agents/usage/`,
-written by `omarchy-agent-usage-update`. That command runs one
-`omarchy-agent-usage-<agent>` collector per agent; the widget invokes it
+written by the local `usage-update` wrapper. That command runs one installed
+`omarchy-agent-usage-<agent>` collector per agent, substituting this plugin's
+`usage-codex.py` for Codex; the widget invokes it
 on its refresh timer and whenever you ask for a refresh, and picks up any
 record that lands in the directory regardless of who wrote it.
 
 Adding an agent therefore never touches this plugin: ship a collector that
-prints the record contract (see the `claude` and `codex` collectors in
-`bin/`), and the panel gains a tab. An `assets/<id>.svg` mark is optional —
+prints the record contract (see the installed `claude` and `codex` collectors
+in `$OMARCHY_PATH/bin/`), and the panel gains a tab. An `assets/<id>.svg` mark is optional —
 with an `assets/<id>-light.svg` twin if the mark needs a dark variant for
 light surfaces — and the bar glyph stands in when there is none.
 
@@ -116,11 +169,14 @@ only adds the meter and the spent-of-funded line under the real figure.
   Tab moves to the neighboring bar panel, Esc closes.
 - IPC: `omarchy-shell omarchy.agents <open|close|toggle|refresh|next>`.
 
+The IPC target retains its upstream `omarchy.agents` name; plugin installation,
+enablement, and bar settings use `nachfq.agents`.
+
 ## Settings
 
 Settings live in the widget's entry in `~/.config/omarchy/shell.json`. The
 top-level keys can be set with
-`omarchy bar set omarchy.agents <key> <value>`:
+`omarchy bar set nachfq.agents <key> <value>`:
 
 | Key | Default | What it does |
 |---|---|---|
@@ -133,8 +189,8 @@ top-level keys can be set with
 Numbers need `--json`, or they land in `shell.json` as strings:
 
 ```bash
-omarchy bar set omarchy.agents refreshIntervalSec 300 --json
-omarchy bar set omarchy.agents syncDir '~/Sync/agent-usage'
+omarchy bar set nachfq.agents refreshIntervalSec 300 --json
+omarchy bar set nachfq.agents syncDir '~/Sync/agent-usage'
 ```
 
 Per-agent enablement is nested, and `set` writes its key literally rather
@@ -142,7 +198,7 @@ than walking a dotted path — so pass the whole `providers` object as JSON (or
 edit `shell.json` directly):
 
 ```bash
-omarchy bar set omarchy.agents providers '{
+omarchy bar set nachfq.agents providers '{
   "claude": { "enabled": true },
   "codex": { "enabled": false },
   "fireworks": { "enabled": true }

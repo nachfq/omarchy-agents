@@ -4,3 +4,22 @@ __pycache__/
 .env.*
 *.log
 *.sock
+
+# Credentials and generated account state belong outside the source tree.
+auth.json
+auth.ini
+credentials.json
+usage.json
+*-usage.json
+codex.json
+claude.json
+fireworks.json
+agents-disabled.json
+*.jsonl
+usage/
+codex-reset-pending.*
+.cache/
+cache/
+.state/
+state/
+*.lock
